@@ -377,6 +377,7 @@
       const emojiToggleBtn = document.getElementById("emoji-toggle-btn");
       const emojiPalette = document.getElementById("emoji-palette");
 
+      // Inicializar paleta de emojis
       fullEmojiList.forEach((emoji) => {
         const span = document.createElement("span");
         span.className = "emoji-item";
@@ -474,19 +475,29 @@
       function connect() {
         const ip = ipInput.value.trim();
         const port = portInput.value.trim();
+        const username = usernameInput.value.trim() || "Anónimo";
+
         if (!ip || !port) return alert("Ingresa IP y puerto.");
 
         appendSystemMsg(`Conectando a ws://${ip}:${port}...`);
         socket = new WebSocket(`ws://${ip}:${port}`);
 
         socket.onopen = () => {
-          appendSystemMsg("Conexión establecida.");
           toggleControls(true);
+          // Notificar al servidor el nombre de este cliente
+          socket.send(
+            JSON.stringify({
+              type: "join",
+              username: username,
+            }),
+          );
         };
 
         socket.onmessage = (event) => {
           const msg = JSON.parse(event.data);
-          if (msg.type === "new_message") {
+          if (msg.type === "system") {
+            appendSystemMsg(msg.text);
+          } else if (msg.type === "new_message") {
             const isMine = msg.sender === usernameInput.value.trim();
             renderMessage(msg, isMine);
           } else if (msg.type === "reaction_update") {
@@ -495,7 +506,7 @@
         };
 
         socket.onclose = () => {
-          appendSystemMsg("Desconectado del servidor.");
+          appendSystemMsg("Te has desconectado.");
           toggleControls(false);
           socket = null;
         };
@@ -548,6 +559,7 @@
         connectBtn.disabled = connected;
         ipInput.disabled = connected;
         portInput.disabled = connected;
+        usernameInput.disabled = connected;
         disconnectBtn.disabled = !connected;
         messageInput.disabled = !connected;
         sendBtn.disabled = !connected;

@@ -8,6 +8,8 @@ console.log(`Servidor de sockets escuchando en el puerto ${PORT}...`);
 const reactionsMap = new Map();
 
 wss.on("connection", (ws) => {
+  ws.username = null;
+
   ws.on("message", (data) => {
     let payload;
     try {
@@ -16,12 +18,18 @@ wss.on("connection", (ws) => {
       return;
     }
 
-    if (payload.type === "chat_message") {
+    if (payload.type === "join") {
+      ws.username = payload.username || "Anónimo";
+      broadcast({
+        type: "system",
+        text: `🟢 ${ws.username} se conectó.`,
+      });
+    } else if (payload.type === "chat_message") {
       const messageId =
         Date.now().toString() + Math.random().toString(36).slice(2, 6);
       reactionsMap.set(messageId, {});
 
-      const broadcastData = {
+      broadcast({
         type: "new_message",
         id: messageId,
         sender: payload.sender || "Anónimo",
@@ -31,9 +39,7 @@ wss.on("connection", (ws) => {
           minute: "2-digit",
         }),
         reactions: {},
-      };
-
-      broadcast(broadcastData);
+      });
     } else if (payload.type === "reaction") {
       const { messageId, emoji, user } = payload;
       if (!reactionsMap.has(messageId)) return;
@@ -55,6 +61,15 @@ wss.on("connection", (ws) => {
         type: "reaction_update",
         messageId,
         reactions: msgReactions,
+      });
+    }
+  });
+
+  ws.on("close", () => {
+    if (ws.username) {
+      broadcast({
+        type: "system",
+        text: `🔴 ${ws.username} se desconectó.`,
       });
     }
   });
